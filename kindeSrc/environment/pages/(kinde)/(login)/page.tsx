@@ -31,15 +31,31 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                 var registerUrl = "${registerUrl}";
                 var errorId = ${JSON.stringify(NO_ACCOUNT_ERROR_ID)};
                 var errorTextPattern = new RegExp(${JSON.stringify(NO_ACCOUNT_ERROR_TEXT_PATTERN)}, "i");
+                var EMAIL_SELECTOR =
+                  'input[name="p_email_username"], #sign_up_sign_in_credentials_p_email_username, input[type="email"], input[name="email"]';
                 var redirected = false;
+                var lastTypedEmail = "";
 
-                function getTypedEmail() {
-                  var input =
-                    document.querySelector('input[name="p_email_username"]') ||
-                    document.querySelector('input[type="email"]') ||
-                    document.querySelector('input[name="email"]');
+                function readEmailFromDom() {
+                  var input = document.querySelector(EMAIL_SELECTOR);
                   return input && input.value ? input.value.trim() : "";
                 }
+
+                function cacheEmail() {
+                  var v = readEmailFromDom();
+                  if (v) lastTypedEmail = v;
+                }
+
+                // Event delegation survives form re-renders.
+                document.addEventListener("input", function (e) {
+                  var t = e.target;
+                  if (t && t.matches && t.matches(EMAIL_SELECTOR)) cacheEmail();
+                }, true);
+                document.addEventListener("change", function (e) {
+                  var t = e.target;
+                  if (t && t.matches && t.matches(EMAIL_SELECTOR)) cacheEmail();
+                }, true);
+                document.addEventListener("submit", cacheEmail, true);
 
                 function buildRegisterUrlWithHint(email) {
                   if (!email) return registerUrl;
@@ -60,7 +76,8 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                   if (errorTextPattern.test(errorText)) {
                     redirected = true;
                     observer.disconnect();
-                    window.location.href = buildRegisterUrlWithHint(getTypedEmail());
+                    var email = readEmailFromDom() || lastTypedEmail;
+                    window.location.href = buildRegisterUrlWithHint(email);
                   }
                 }
 
@@ -70,6 +87,7 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                   subtree: true,
                   characterData: true,
                 });
+                cacheEmail();
                 checkForNoAccountError();
               })();
             `,
