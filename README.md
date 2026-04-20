@@ -45,6 +45,36 @@ The template includes customizable layouts for all authentication pages:
 
 Each layout can be customized in the `kindeSrc/enviroment/pages/(kinde)` directory.
 
+## How it works: redirect to sign-up on unknown email
+
+When a user tries to sign in with an email that has no Kinde account, this template automatically redirects them to the sign-up page with their email pre-filled — instead of leaving them stuck on the "No account found with this email" error.
+
+The flow spans two custom-UI pages:
+
+**On the login page (`kindeSrc/environment/pages/(kinde)/(login)/page.tsx`)**
+
+1. An injected client script caches whatever the user types into the email/username input, using event delegation on `document` so it survives Kinde re-rendering the form.
+2. A `MutationObserver` on `document.body` watches for Kinde's validation error element to appear. It matches either of the two field ids Kinde uses depending on the configured auth identifier:
+   - `sign_up_sign_in_credentials_p_email_username_error_msg` (email-or-username mode)
+   - `sign_up_sign_in_credentials_p_email_error_msg` (email-only mode)
+3. When the error text matches `/No account found/i`, the script writes the cached email to `sessionStorage` under `kinde_prefill_email` and navigates to `getKindeRegisterUrl()`.
+
+**On the register page (`kindeSrc/environment/pages/(kinde)/(register)/page.tsx`)**
+
+1. On load, a client script reads `sessionStorage["kinde_prefill_email"]`.
+2. If present, it writes the value into the register form's email input using the native `HTMLInputElement.prototype` value setter (so React's synthetic-event tracker picks up the change) and dispatches `input` + `change` events.
+3. A `MutationObserver` retries the fill until the input mounts (Kinde widgets load async), with a 10-second safety timeout.
+4. The storage entry is cleared after fill so a direct visit to `/register` later doesn't auto-fill with a stale value.
+
+### Why sessionStorage instead of `login_hint` on the URL?
+
+Kinde's custom-UI URLs (e.g. `/auth/cx/_:nav&m:register&psid:...`) are not standard query-string routes, and the register widget does not currently honor OIDC `login_hint` as a prefill source. `sessionStorage` is same-origin and survives the redirect, which makes it the reliable handoff mechanism. The login page still appends `?login_hint=` to the URL as a no-op fallback in case future Kinde releases do honor it.
+
+### Tuning
+
+- The "No account found" trigger text is controlled by `NO_ACCOUNT_ERROR_TEXT_PATTERN` in the login page — change the regex if your Kinde account customizes the error copy.
+- If the `EMAIL_STORAGE_KEY` constant is renamed, update both `(login)/page.tsx` and `(register)/page.tsx` — they must match.
+
 ## Project Structure
 
 ```

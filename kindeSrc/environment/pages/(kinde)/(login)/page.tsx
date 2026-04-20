@@ -11,9 +11,18 @@ import { renderToString } from "react-dom/server.browser";
 import { DefaultLayout } from "../../../../layouts/default";
 import { Root } from "../../../../root";
 
-const NO_ACCOUNT_ERROR_ID =
-  "sign_up_sign_in_credentials_p_email_username_error_msg";
+// Kinde uses different field ids depending on the configured auth identifier:
+// `p_email_username` for email-or-username login, `p_email` for email-only.
+// We match either plus a data-attribute fallback in case ids change.
+const NO_ACCOUNT_ERROR_SELECTOR = [
+  "#sign_up_sign_in_credentials_p_email_username_error_msg",
+  "#sign_up_sign_in_credentials_p_email_error_msg",
+  '[id$="_p_email_username_error_msg"]',
+  '[id$="_p_email_error_msg"]',
+  '[data-kinde-control-associated-text-variant="invalid-message"]',
+].join(", ");
 const NO_ACCOUNT_ERROR_TEXT_PATTERN = "No account found";
+// Shared with the register page — do not rename without updating both pages.
 const EMAIL_STORAGE_KEY = "kinde_prefill_email";
 
 const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
@@ -28,13 +37,19 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
           nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `
+              // Watches for Kinde's "No account found" validation error. When it
+              // appears, stashes the typed email in sessionStorage (so the register
+              // page can prefill it) and navigates to the register URL.
+              // sessionStorage is used because Kinde's custom-UI URLs
+              // (/auth/cx/_:nav&m:register&...) aren't standard query strings, so
+              // appending ?login_hint= is unreliable.
               (function () {
                 var registerUrl = "${registerUrl}";
-                var errorId = ${JSON.stringify(NO_ACCOUNT_ERROR_ID)};
+                var errorSelector = ${JSON.stringify(NO_ACCOUNT_ERROR_SELECTOR)};
                 var errorTextPattern = new RegExp(${JSON.stringify(NO_ACCOUNT_ERROR_TEXT_PATTERN)}, "i");
                 var STORAGE_KEY = ${JSON.stringify(EMAIL_STORAGE_KEY)};
                 var EMAIL_SELECTOR =
-                  'input[name="p_email_username"], #sign_up_sign_in_credentials_p_email_username, input[type="email"], input[name="email"]';
+                  'input[name="p_email_username"], input[name="p_email"], #sign_up_sign_in_credentials_p_email_username, #sign_up_sign_in_credentials_p_email, input[type="email"], input[name="email"]';
                 var redirected = false;
                 var lastTypedEmail = "";
 
@@ -51,7 +66,10 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                   }
                 }
 
-                // Event delegation survives form re-renders.
+                // Delegation on document (capture phase) — Kinde may replace the
+                // form node when showing the error, so listeners bound directly to
+                // the input would be lost. Capture phase ensures we see the event
+                // even if Kinde's handlers call stopPropagation.
                 document.addEventListener("input", function (e) {
                   var t = e.target;
                   if (t && t.matches && t.matches(EMAIL_SELECTOR)) cacheEmail();
@@ -60,8 +78,13 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                   var t = e.target;
                   if (t && t.matches && t.matches(EMAIL_SELECTOR)) cacheEmail();
                 }, true);
+                // Capture on submit too — last chance to grab the value before
+                // Kinde potentially clears the input during re-render.
                 document.addEventListener("submit", cacheEmail, true);
 
+                // Belt-and-braces: also append login_hint to the URL. sessionStorage
+                // is the primary handoff, but if a future Kinde release honors
+                // login_hint on custom-UI routes, this will already work.
                 function buildRegisterUrlWithHint(email) {
                   if (!email) return registerUrl;
                   try {
@@ -76,19 +99,26 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
 
                 function checkForNoAccountError() {
                   if (redirected) return;
-                  var el = document.getElementById(errorId);
-                  var errorText = el && el.textContent ? el.textContent.trim() : "";
-                  if (errorTextPattern.test(errorText)) {
-                    redirected = true;
-                    observer.disconnect();
-                    var email = readEmailFromDom() || lastTypedEmail;
-                    if (email) {
-                      try { sessionStorage.setItem(STORAGE_KEY, email); } catch (e) {}
+                  var els = document.querySelectorAll(errorSelector);
+                  for (var i = 0; i < els.length; i++) {
+                    var text = els[i].textContent ? els[i].textContent.trim() : "";
+                    if (errorTextPattern.test(text)) {
+                      redirected = true;
+                      observer.disconnect();
+                      var email = readEmailFromDom() || lastTypedEmail;
+                      if (email) {
+                        try { sessionStorage.setItem(STORAGE_KEY, email); } catch (e) {}
+                      }
+                      window.location.href = buildRegisterUrlWithHint(email);
+                      return;
                     }
-                    window.location.href = buildRegisterUrlWithHint(email);
                   }
                 }
 
+                // The error element is injected asynchronously after Kinde
+                // validates the submission, so we observe body mutations rather
+                // than checking once. characterData=true covers the case where
+                // Kinde updates text inside an existing error node.
                 var observer = new MutationObserver(checkForNoAccountError);
                 observer.observe(document.body, {
                   childList: true,
