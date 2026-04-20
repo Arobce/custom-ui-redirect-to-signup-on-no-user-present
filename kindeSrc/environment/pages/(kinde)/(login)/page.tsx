@@ -13,7 +13,7 @@ import { Root } from "../../../../root";
 
 const NO_ACCOUNT_ERROR_ID =
   "sign_up_sign_in_credentials_p_email_username_error_msg";
-const NO_ACCOUNT_ERROR_TEXT = "No account found with this email";
+const NO_ACCOUNT_ERROR_TEXT_PATTERN = "No account found";
 
 const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
   const nonce = getKindeNonce();
@@ -30,7 +30,7 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
               (function () {
                 var registerUrl = "${registerUrl}";
                 var errorId = ${JSON.stringify(NO_ACCOUNT_ERROR_ID)};
-                var errorText = ${JSON.stringify(NO_ACCOUNT_ERROR_TEXT)};
+                var errorTextPattern = new RegExp(${JSON.stringify(NO_ACCOUNT_ERROR_TEXT_PATTERN)}, "i");
                 var redirected = false;
 
                 function getTypedEmail() {
@@ -56,7 +56,8 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                 function checkForNoAccountError() {
                   if (redirected) return;
                   var el = document.getElementById(errorId);
-                  if (el && el.textContent && el.textContent.trim() === errorText) {
+                  var errorText = el && el.textContent ? el.textContent.trim() : "";
+                  if (errorTextPattern.test(errorText)) {
                     redirected = true;
                     observer.disconnect();
                     window.location.href = buildRegisterUrlWithHint(getTypedEmail());
