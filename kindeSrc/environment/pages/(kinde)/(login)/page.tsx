@@ -14,6 +14,7 @@ import { Root } from "../../../../root";
 const NO_ACCOUNT_ERROR_ID =
   "sign_up_sign_in_credentials_p_email_username_error_msg";
 const NO_ACCOUNT_ERROR_TEXT_PATTERN = "No account found";
+const EMAIL_STORAGE_KEY = "kinde_prefill_email";
 
 const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
   const nonce = getKindeNonce();
@@ -31,6 +32,7 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                 var registerUrl = "${registerUrl}";
                 var errorId = ${JSON.stringify(NO_ACCOUNT_ERROR_ID)};
                 var errorTextPattern = new RegExp(${JSON.stringify(NO_ACCOUNT_ERROR_TEXT_PATTERN)}, "i");
+                var STORAGE_KEY = ${JSON.stringify(EMAIL_STORAGE_KEY)};
                 var EMAIL_SELECTOR =
                   'input[name="p_email_username"], #sign_up_sign_in_credentials_p_email_username, input[type="email"], input[name="email"]';
                 var redirected = false;
@@ -43,7 +45,10 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
 
                 function cacheEmail() {
                   var v = readEmailFromDom();
-                  if (v) lastTypedEmail = v;
+                  if (v) {
+                    lastTypedEmail = v;
+                    try { sessionStorage.setItem(STORAGE_KEY, v); } catch (e) {}
+                  }
                 }
 
                 // Event delegation survives form re-renders.
@@ -77,6 +82,9 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                     redirected = true;
                     observer.disconnect();
                     var email = readEmailFromDom() || lastTypedEmail;
+                    if (email) {
+                      try { sessionStorage.setItem(STORAGE_KEY, email); } catch (e) {}
+                    }
                     window.location.href = buildRegisterUrlWithHint(email);
                   }
                 }
