@@ -1,0 +1,66 @@
+"use server";
+
+import { Widget } from "../../../../components/widget";
+import {
+  getKindeNonce,
+  getKindeRegisterUrl,
+  type KindePageEvent,
+} from "@kinde/infrastructure";
+import React from "react";
+import { renderToString } from "react-dom/server.browser";
+import { DefaultLayout } from "../../../../layouts/default";
+import { Root } from "../../../../root";
+
+const NO_ACCOUNT_ERROR_ID =
+  "sign_up_sign_in_credentials_p_email_username_error_msg";
+const NO_ACCOUNT_ERROR_TEXT = "No account found with this email";
+
+const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
+  const nonce = getKindeNonce();
+  const registerUrl = getKindeRegisterUrl();
+
+  return (
+    <Root context={context} request={request}>
+      <DefaultLayout>
+        <Widget heading={context.widget.content.heading} />
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                var registerUrl = "${registerUrl}";
+                var errorId = ${JSON.stringify(NO_ACCOUNT_ERROR_ID)};
+                var errorText = ${JSON.stringify(NO_ACCOUNT_ERROR_TEXT)};
+                var redirected = false;
+
+                function checkForNoAccountError() {
+                  if (redirected) return;
+                  var el = document.getElementById(errorId);
+                  if (el && el.textContent && el.textContent.trim() === errorText) {
+                    redirected = true;
+                    observer.disconnect();
+                    window.location.href = registerUrl;
+                  }
+                }
+
+                var observer = new MutationObserver(checkForNoAccountError);
+                observer.observe(document.body, {
+                  childList: true,
+                  subtree: true,
+                  characterData: true,
+                });
+                checkForNoAccountError();
+              })();
+            `,
+          }}
+        />
+      </DefaultLayout>
+    </Root>
+  );
+};
+
+// Page Component
+export default async function Page(event: KindePageEvent): Promise<string> {
+  const page = await DefaultPage(event);
+  return renderToString(page);
+}
