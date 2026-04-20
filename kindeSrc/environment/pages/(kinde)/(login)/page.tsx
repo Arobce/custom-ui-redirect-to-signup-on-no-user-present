@@ -33,13 +33,33 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                 var errorText = ${JSON.stringify(NO_ACCOUNT_ERROR_TEXT)};
                 var redirected = false;
 
+                function getTypedEmail() {
+                  var input =
+                    document.querySelector('input[name="p_email_username"]') ||
+                    document.querySelector('input[type="email"]') ||
+                    document.querySelector('input[name="email"]');
+                  return input && input.value ? input.value.trim() : "";
+                }
+
+                function buildRegisterUrlWithHint(email) {
+                  if (!email) return registerUrl;
+                  try {
+                    var url = new URL(registerUrl, window.location.origin);
+                    url.searchParams.set("login_hint", email);
+                    return url.toString();
+                  } catch (e) {
+                    var sep = registerUrl.indexOf("?") === -1 ? "?" : "&";
+                    return registerUrl + sep + "login_hint=" + encodeURIComponent(email);
+                  }
+                }
+
                 function checkForNoAccountError() {
                   if (redirected) return;
                   var el = document.getElementById(errorId);
                   if (el && el.textContent && el.textContent.trim() === errorText) {
                     redirected = true;
                     observer.disconnect();
-                    window.location.href = registerUrl;
+                    window.location.href = buildRegisterUrlWithHint(getTypedEmail());
                   }
                 }
 
