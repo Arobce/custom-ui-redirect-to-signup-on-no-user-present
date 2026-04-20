@@ -21,7 +21,13 @@ const NO_ACCOUNT_ERROR_SELECTOR = [
   '[id$="_p_email_error_msg"]',
   '[data-kinde-control-associated-text-variant="invalid-message"]',
 ].join(", ");
-const NO_ACCOUNT_ERROR_TEXT_PATTERN = "No account found";
+// Kinde returns different copy for the "unknown account" error depending on
+// account config. Known variants:
+//   - "No account found with this email"
+//   - "Sorry, we don't recognise that email address or username."
+// Add new phrasings here if you customize the error message in Kinde.
+const NO_ACCOUNT_ERROR_TEXT_PATTERN =
+  "no account found|don'?t recognise|don'?t recognize";
 // Shared with the register page — do not rename without updating both pages.
 const EMAIL_STORAGE_KEY = "kinde_prefill_email";
 

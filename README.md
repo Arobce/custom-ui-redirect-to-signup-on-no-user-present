@@ -57,7 +57,7 @@ The flow spans two custom-UI pages:
 2. A `MutationObserver` on `document.body` watches for Kinde's validation error element to appear. It matches either of the two field ids Kinde uses depending on the configured auth identifier:
    - `sign_up_sign_in_credentials_p_email_username_error_msg` (email-or-username mode)
    - `sign_up_sign_in_credentials_p_email_error_msg` (email-only mode)
-3. When the error text matches `/No account found/i`, the script writes the cached email to `sessionStorage` under `kinde_prefill_email` and navigates to `getKindeRegisterUrl()`.
+3. When the error text matches the configured pattern (case-insensitive; default covers both `"No account found with this email"` and `"Sorry, we don't recognise that email address or username."`), the script writes the cached email to `sessionStorage` under `kinde_prefill_email` and navigates to `getKindeRegisterUrl()`.
 
 **On the register page (`kindeSrc/environment/pages/(kinde)/(register)/page.tsx`)**
 
@@ -72,7 +72,7 @@ Kinde's custom-UI URLs (e.g. `/auth/cx/_:nav&m:register&psid:...`) are not stand
 
 ### Tuning
 
-- The "No account found" trigger text is controlled by `NO_ACCOUNT_ERROR_TEXT_PATTERN` in the login page — change the regex if your Kinde account customizes the error copy.
+- The error-text trigger is controlled by `NO_ACCOUNT_ERROR_TEXT_PATTERN` in the login page. It's a regex source string (compiled with the `i` flag) and uses `|` alternation to match multiple known phrasings. Add new variants if your Kinde account customizes the error copy.
 - If the `EMAIL_STORAGE_KEY` constant is renamed, update both `(login)/page.tsx` and `(register)/page.tsx` — they must match.
 
 ## Project Structure
