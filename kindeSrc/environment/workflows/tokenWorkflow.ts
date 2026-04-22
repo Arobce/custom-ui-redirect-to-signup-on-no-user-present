@@ -1,58 +1,48 @@
 import {
-    onUserTokenGeneratedEvent,
-    WorkflowSettings,
-    WorkflowTrigger,
-    accessTokenCustomClaims,
+  onUserTokenGeneratedEvent,
+  WorkflowSettings,
+  WorkflowTrigger,
+  accessTokenCustomClaims,
 } from "@kinde/infrastructure";
 
 export const workflowSettings: WorkflowSettings = {
-    id: "debugUserTokenGeneration",
-    name: "DebugUserTokenGeneration",
-    trigger: WorkflowTrigger.UserTokenGeneration,
-    failurePolicy: {
-        action: "stop",
-    },
-    bindings: {
-        "kinde.accessToken": {},
-        "kinde.env": {},
-        url: {},
-    },
+  id: "debugUserTokenGeneration",
+  name: "DebugUserTokenGeneration",
+  trigger: WorkflowTrigger.UserTokenGeneration,
+  failurePolicy: {
+    action: "stop",
+  },
+  bindings: {
+    "kinde.accessToken": {},
+    "kinde.env": {},
+    url: {},
+  },
 };
 
 export default async function (event: onUserTokenGeneratedEvent) {
-    // -------- FULL EVENT DEBUG --------
-    try {
-        console.log("==== FULL EVENT START ====");
-        console.log(JSON.stringify(event, null, 2));
-        console.log("==== FULL EVENT END ====");
-    } catch (e) {
-        console.log("Could not stringify full event");
-    }
+  console.log("==== FULL EVENT START ====");
+  console.log(JSON.stringify(event, null, 2));
+  console.log("==== FULL EVENT END ====");
 
-    // -------- IMPORTANT FIELDS --------
-    console.log("==== AUTH CONTEXT ====");
-    console.log("origin:", event?.context?.auth?.origin);
-    console.log("method:", event?.context?.auth?.method);
-    console.log("provider:", event?.context?.auth?.provider);
-    console.log("session:", event?.context?.session);
-    console.log("user:", event?.context?.user?.id);
+  const origin = event?.context?.auth?.origin;
+  const isExistingSession = event?.context?.auth?.isExistingSession;
 
-    // -------- TOKEN CLAIMS --------
-    const accessToken = accessTokenCustomClaims<{
-        custom_auth_time?: string;
-    }>();
+  console.log("origin:", origin);
+  console.log("isExistingSession:", isExistingSession);
 
-    // TEMP: always set for testing
+  const accessToken = accessTokenCustomClaims<{
+    custom_auth_time?: string;
+    auth_debug_origin?: string;
+    auth_debug_existing_session?: string;
+  }>();
+
+  accessToken.auth_debug_origin = String(origin ?? "");
+  accessToken.auth_debug_existing_session = String(isExistingSession ?? "");
+
+  if (origin === "authorization_request" && isExistingSession === false) {
     accessToken.custom_auth_time = new Date().toISOString();
-
     console.log("Set custom_auth_time:", accessToken.custom_auth_time);
-
-    // -------- OPTIONAL: CONDITIONAL LOGGING --------
-    if (event?.context?.auth?.origin === "refresh_token_request") {
-        console.log("⚠️ This is a REFRESH TOKEN request");
-    }
-
-    if (event?.context?.auth?.origin === "authorization_request") {
-        console.log("✅ This is an AUTHORIZATION request (likely login)");
-    }
+  } else {
+    console.log("Did not set custom_auth_time");
+  }
 }
