@@ -44,7 +44,7 @@ export const Header = (props: { page: "login" | "register" }) => {
           <img className="logo" src={getDarkModeLogoUrl()} alt={"logo"} />
         </div>
         {props.page === "login" ? (
-          <a href={getKindeRegisterUrl()} className="action-button">
+          <a href={`${getKindeRegisterUrl()}?login_hint=arobce@gmail.com`} className="action-button">
             SIGN UP
           </a>
         ) : (
