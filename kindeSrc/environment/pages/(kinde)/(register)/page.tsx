@@ -34,7 +34,20 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                 var EMAIL_SELECTOR =
                   'input[name="p_email_username"], input[name="p_email"], #sign_up_sign_in_credentials_p_email_username, input[type="email"], input[name="email"]';
                 var email = "";
+
+                function readLoginHintFromUrl() {
+                  try {
+                    var params = new URLSearchParams(window.location.search);
+                    return params.get("login_hint") || "";
+                  } catch (e) {
+                    return "";
+                  }
+                }
+
                 try { email = sessionStorage.getItem(STORAGE_KEY) || ""; } catch (e) {}
+                if (!email) {
+                  email = readLoginHintFromUrl();
+                }
                 if (!email) return;
 
                 var filled = false;

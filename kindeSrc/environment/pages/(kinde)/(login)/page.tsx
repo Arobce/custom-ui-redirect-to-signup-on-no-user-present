@@ -58,6 +58,16 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                   'input[name="p_email_username"], input[name="p_email"], #sign_up_sign_in_credentials_p_email_username, #sign_up_sign_in_credentials_p_email, input[type="email"], input[name="email"]';
                 var redirected = false;
                 var lastTypedEmail = "";
+                var testHintParam = "test_login_hint";
+
+                function readTestHintFromUrl() {
+                  try {
+                    var params = new URLSearchParams(window.location.search);
+                    return params.get(testHintParam) || "";
+                  } catch (e) {
+                    return "";
+                  }
+                }
 
                 function readEmailFromDom() {
                   var input = document.querySelector(EMAIL_SELECTOR);
@@ -119,6 +129,16 @@ const DefaultPage: React.FC<KindePageEvent> = ({ context, request }) => {
                       return;
                     }
                   }
+                }
+
+                // Test-only escape hatch: open the login page with
+                // ?test_login_hint=person@example.com to bypass the normal error
+                // detection and verify whether the register page receives a
+                // login_hint that it can use to prefill the form.
+                var testHint = readTestHintFromUrl();
+                if (testHint) {
+                  window.location.href = buildRegisterUrlWithHint(testHint);
+                  return;
                 }
 
                 // The error element is injected asynchronously after Kinde

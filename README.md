@@ -70,6 +70,10 @@ The flow spans two custom-UI pages:
 
 Kinde's custom-UI URLs (e.g. `/auth/cx/_:nav&m:register&psid:...`) are not standard query-string routes, and the register widget does not currently honor OIDC `login_hint` as a prefill source. `sessionStorage` is same-origin and survives the redirect, which makes it the reliable handoff mechanism. The login page still appends `?login_hint=` to the URL as a no-op fallback in case future Kinde releases do honor it.
 
+To test whether your infra-generated register URL preserves `login_hint`, open the register page with a `login_hint` query parameter. The register page now treats that value as a fallback prefill source, so if the parameter survives the redirect you should see the email field populated.
+
+For an explicit smoke test, open the login page with `?test_login_hint=person@example.com`. That skips the normal "No account found" trigger, redirects straight to the register URL with `login_hint=person@example.com`, and lets you verify whether the register page pre-fills from the URL.
+
 ### Tuning
 
 - The error-text trigger is controlled by `NO_ACCOUNT_ERROR_TEXT_PATTERN` in the login page. It's a regex source string (compiled with the `i` flag) and uses `|` alternation to match multiple known phrasings. Add new variants if your Kinde account customizes the error copy.
