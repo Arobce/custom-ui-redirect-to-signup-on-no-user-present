@@ -29,6 +29,22 @@ interface WorkflowEvent {
   };
 }
 
+interface BillingInfo {
+  customer_id?: string | null;
+}
+
+interface OrganizationResponse {
+  code?: string;
+  billing?: BillingInfo;
+  [key: string]: unknown;
+}
+
+interface UserResponse {
+  id?: string;
+  billing?: BillingInfo;
+  [key: string]: unknown;
+}
+
 interface BillingAgreement {
   id?: string;
   plan_code?: string;
@@ -41,7 +57,7 @@ interface BillingAgreementsResponse {
   [key: string]: unknown;
 }
 
-const FREE_PLAN_CODE = "quodsi_free";
+const FREE_PLAN_CODE = "standard-organization-plans";
 
 const ensureArray = <T,>(value: unknown): T[] =>
   Array.isArray(value) ? (value as T[]) : [];
@@ -65,17 +81,37 @@ export default async function Workflow(event: WorkflowEvent) {
 
     const kindeAPI = await createKindeAPI(event);
 
-    /**
-     * Step 1:
-     * Check whether the org already has a billing agreement.
-     *
-     * IMPORTANT:
-     * Confirm this endpoint internally. This is the likely shape,
-     * but the exact public endpoint may differ.
-     */
+    // 1. Prefer org billing customer for org-only billing
+    const { data: org } = await kindeAPI.get<OrganizationResponse>({
+      endpoint: `organization?code=${orgCode}&expand=billing`,
+    });
+
+    let customerId = org?.billing?.customer_id ?? null;
+
+    // 2. Fallback to user billing customer only if org billing customer is missing
+    if (!customerId) {
+      console.warn(
+        `No org billing customer found for ${orgCode}. Trying user billing customer.`
+      );
+
+      const { data: user } = await kindeAPI.get<UserResponse>({
+        endpoint: `user?id=${userId}&expand=billing`,
+      });
+
+      customerId = user?.billing?.customer_id ?? null;
+    }
+
+    if (!customerId) {
+      console.warn(
+        `No billing customer found for org ${orgCode} or user ${userId}. Cannot assign Free plan.`
+      );
+      return;
+    }
+
+    // 3. Check if billing customer already has an agreement
     const { data: agreementsResponse } =
       await kindeAPI.get<BillingAgreementsResponse>({
-        endpoint: `billing/agreements?organization_code=${orgCode}`,
+        endpoint: `billing/agreements?customer_id=${customerId}`,
       });
 
     const agreements = ensureArray<BillingAgreement>(
@@ -84,30 +120,24 @@ export default async function Workflow(event: WorkflowEvent) {
 
     if (agreements.length > 0) {
       console.log(
-        `Organization ${orgCode} already has a billing agreement. Skipping.`
+        `Billing customer ${customerId} already has an agreement. Skipping.`
       );
       return;
     }
 
-    /**
-     * Step 2:
-     * Attach the Free plan to the org.
-     *
-     * IMPORTANT:
-     * Replace this endpoint/body with the confirmed Management API endpoint.
-     * Do not use internal admin URLs like:
-     * /organization_plan_manual_assignment/index
-     */
+    // 4. Create billing agreement with Free plan
     await kindeAPI.post({
       endpoint: "billing/agreements",
       data: {
-        organization_code: orgCode,
-        billing_plan_code: FREE_PLAN_CODE,
+        customer_id: customerId,
+        plan_code: FREE_PLAN_CODE,
+        is_invoice_now: false,
+        is_prorate: false,
       },
     });
 
     console.log(
-      `Free plan ${FREE_PLAN_CODE} assigned to organization ${orgCode} for user ${userId}`
+      `Free plan ${FREE_PLAN_CODE} assigned to customer ${customerId} for org ${orgCode}.`
     );
   } catch (err) {
     console.error("Workflow error:", (err as Error).message ?? err);
